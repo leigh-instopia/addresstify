@@ -1,0 +1,27 @@
+# Build stage
+FROM golang:1.25-bookworm AS builder
+
+WORKDIR /build
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=1 GOOS=linux go build -tags "fts5" -o gnaf-loader ./cmd/loader
+
+# Runtime stage
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=builder /build/gnaf-loader .
+
+VOLUME ["/data"]
+
+ENV GNAF_DB_PATH=/data/gnaf.sqlite
+ENV GNAF_DATA_DIR=/data/gnaf-raw
+
+ENTRYPOINT ["./gnaf-loader"]

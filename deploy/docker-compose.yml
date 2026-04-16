@@ -1,0 +1,43 @@
+services:
+
+  # Run the loader first to build the database:
+  #   docker compose -f deploy/docker-compose.yml --profile loader run --rm loader
+  #
+  # Then bring up the API:
+  #   docker compose -f deploy/docker-compose.yml up api
+
+  loader:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.loader
+    volumes:
+      - gnaf-data:/data
+    environment:
+      GNAF_DB_PATH: /data/gnaf.sqlite
+      GNAF_DATA_DIR: /data/gnaf-raw
+      # GNAF_STATES: QLD
+    profiles:
+      - loader
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    ports:
+      - "8088:8080"
+    volumes:
+      - gnaf-data:/data
+    environment:
+      GNAF_DB_PATH: /data/gnaf.sqlite
+      GNAF_ADDR: :8080
+      GNAF_CORS_ORIGIN: "*"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  gnaf-data:
+    driver: local
